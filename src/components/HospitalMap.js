@@ -137,10 +137,141 @@ function BuildingFloor({ floor, zOffset, onClick, onEnter, onLeave }) {
 }
 
 /* ══════════════════════════════════════════
-   ARSITEKTUR BLUEPRINT FLOORPLAN (BARU)
+   FLOOR SELECTOR PANEL (BARU)
+   Panel tombol pemilih lantai untuk pengguna awam.
+   Tampil di sebelah kanan gedung 3D saat view gedung,
+   dan di bawah saat view denah lantai.
+══════════════════════════════════════════ */
+const floorConfig = [
+  {
+    floor: 3,
+    label: 'Lantai 3',
+    sublabel: 'Unit Rawat Inap',
+    icon: '🛏️',
+    dotColor: 'bg-emerald-500',
+    ringColor: 'ring-emerald-200',
+    iconBg: 'bg-emerald-50',
+    activeBorder: 'border-emerald-500',
+    activeBg: 'bg-emerald-50',
+    activeText: 'text-emerald-700',
+  },
+  {
+    floor: 2,
+    label: 'Lantai 2',
+    sublabel: 'ICU / Intensive Care',
+    icon: '🫀',
+    dotColor: 'bg-red-500',
+    ringColor: 'ring-red-200',
+    iconBg: 'bg-red-50',
+    activeBorder: 'border-red-500',
+    activeBg: 'bg-red-50',
+    activeText: 'text-red-700',
+  },
+  {
+    floor: 1,
+    label: 'Lantai 1',
+    sublabel: 'IGD / Emergency',
+    icon: '🚑',
+    dotColor: 'bg-amber-500',
+    ringColor: 'ring-amber-200',
+    iconBg: 'bg-amber-50',
+    activeBorder: 'border-amber-500',
+    activeBg: 'bg-amber-50',
+    activeText: 'text-amber-700',
+  },
+];
+
+function FloorSelectorPanel({ selectedFloor, onSelectFloor, onBack, variant = 'side' }) {
+  // variant: 'side' = di samping gedung 3D, 'bottom' = di bawah denah lantai
+  const isSide = variant === 'side';
+
+  return (
+    <div
+      className={`
+        flex z-20
+        ${isSide
+          ? 'flex-col gap-2 w-44'
+          : 'flex-row gap-2 justify-center w-full max-w-sm'}
+      `}
+    >
+      {/* Label Panel */}
+      <div className={`
+        font-mono text-[9px] font-black text-slate-400 tracking-widest uppercase
+        ${isSide ? 'mb-1 flex items-center gap-1' : 'hidden'}
+      `}>
+        <span className="w-1.5 h-1.5 rounded-full bg-sky-400 inline-block" />
+        Pilih Lantai
+      </div>
+
+      {floorConfig.map(({ floor, label, sublabel, icon, dotColor, ringColor, iconBg, activeBorder, activeBg, activeText }) => {
+        const isActive = selectedFloor === floor;
+        return (
+          <button
+            key={floor}
+            onClick={() => onSelectFloor(floor)}
+            className={`
+              flex items-center gap-2.5 rounded-xl border-2 transition-all duration-200 text-left group
+              ${isSide ? 'px-3 py-2.5 w-full' : 'px-3 py-2 flex-1'}
+              ${isActive
+                ? `${activeBorder} ${activeBg} shadow-md`
+                : 'border-slate-200 bg-white/80 hover:border-slate-300 hover:bg-white hover:shadow-sm active:scale-95'}
+            `}
+          >
+            {/* Icon */}
+            <div className={`
+              w-8 h-8 rounded-lg flex items-center justify-center text-base flex-shrink-0
+              ${isActive ? iconBg : 'bg-slate-100 group-hover:bg-slate-50'}
+            `}>
+              {icon}
+            </div>
+
+            {/* Text */}
+            <div className="flex-1 min-w-0">
+              <div className={`
+                text-[11px] font-black tracking-tight leading-tight
+                ${isActive ? activeText : 'text-slate-700'}
+              `}>
+                {label}
+              </div>
+              <div className="text-[9px] text-slate-400 font-mono leading-tight mt-0.5 truncate">
+                {sublabel}
+              </div>
+            </div>
+
+            {/* Status Dot */}
+            <div className="flex flex-col items-center gap-0.5 flex-shrink-0">
+              <span className={`w-2 h-2 rounded-full ${dotColor} ${isActive ? `ring-2 ${ringColor}` : 'opacity-60'} animate-pulse`} />
+              {isActive && (
+                <span className="text-[7px] font-black text-slate-400">●</span>
+              )}
+            </div>
+          </button>
+        );
+      })}
+
+      {/* Tombol Kembali — hanya tampil saat ada lantai yang dipilih */}
+      {selectedFloor !== null && onBack && (
+        <button
+          onClick={onBack}
+          className={`
+            flex items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-slate-300
+            bg-transparent hover:bg-slate-100 hover:border-slate-400
+            text-slate-500 hover:text-slate-700 font-bold text-[10px] font-mono
+            transition-all duration-200 active:scale-95
+            ${isSide ? 'px-3 py-2 mt-1 w-full' : 'px-3 py-2'}
+          `}
+        >
+          ← Gedung 3D
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   ARSITEKTUR BLUEPRINT FLOORPLAN
 ══════════════════════════════════════════ */
 
-// Komponen Pembentuk Ruangan (Blueprint Room)
 function BlueprintRoom({ id, title, patient, status, isActive, selectedRoom, setSelectedRoom, className, children, door }) {
   const isSelected = selectedRoom === id;
   return (
@@ -150,23 +281,19 @@ function BlueprintRoom({ id, title, patient, status, isActive, selectedRoom, set
         ${isSelected ? 'border-sky-500 bg-sky-50 shadow-[0_0_15px_rgba(14,165,233,0.2)] z-10' : 'border-slate-700 bg-white hover:bg-slate-50'}
         ${className}`}
     >
-      {/* Visualisasi Celah Pintu (Door Cutout) */}
       {door === 'bottom' && <div className="absolute -bottom-[4px] left-1/2 -translate-x-1/2 w-8 h-[4px] bg-slate-100" />}
       {door === 'top' && <div className="absolute -top-[4px] left-1/2 -translate-x-1/2 w-8 h-[4px] bg-slate-100" />}
       {door === 'right' && <div className="absolute top-1/2 -right-[4px] -translate-y-1/2 w-[4px] h-8 bg-slate-100" />}
       
-      {/* Header Info Ruangan */}
       <div className="flex justify-between items-start w-full mb-1">
         <span className={`text-[10px] font-black tracking-tight ${isSelected ? 'text-sky-700' : 'text-slate-800'}`}>{title}</span>
         <span className={`w-2 h-2 rounded-full shadow-sm ${isActive ? 'bg-emerald-500 animate-pulse' : 'bg-slate-300'}`} />
       </div>
 
-      {/* Maket Interior (Bed, Meja, dll) */}
       <div className="flex-1 flex items-center justify-center relative pointer-events-none">
         {children}
       </div>
 
-      {/* Status Footer */}
       <div className="mt-auto pt-1 border-t border-slate-200 w-full flex justify-between items-center">
         <span className="text-[8px] font-mono font-bold text-slate-500">{patient || status}</span>
         {isSelected && <span className="text-[7px] font-bold text-sky-600 bg-sky-100 px-1 rounded">LIVE</span>}
@@ -175,12 +302,10 @@ function BlueprintRoom({ id, title, patient, status, isActive, selectedRoom, set
   );
 }
 
-// Master Komponen Denah 2D
 function FloorPlan({ floor, selectedRoom, setSelectedRoom }) {
   return (
     <div className="w-full max-w-sm bg-slate-100 border-[6px] border-slate-800 rounded-xl p-3 shadow-2xl animate-[fadeIn_.3s_ease] relative">
       
-      {/* Ornamen Blueprint (Mata Angin & Skala) */}
       <div className="absolute -top-4 -right-2 bg-slate-800 text-white text-[8px] font-mono px-2 py-1 rounded shadow-lg flex items-center gap-2 border border-slate-600">
         <span className="font-bold text-sky-300">N ⬆</span> <span className="opacity-50">|</span> <span>1:100</span>
       </div>
@@ -190,7 +315,6 @@ function FloorPlan({ floor, selectedRoom, setSelectedRoom }) {
         <span className="bg-slate-200 px-1.5 py-0.5 rounded text-slate-600">{floor === 1 ? 'EMERGENCY' : floor === 2 ? 'INTENSIVE CARE' : 'INPATIENT'}</span>
       </div>
 
-      {/* ── LAYOUT ARSITEKTUR LANTAI 1 (IGD) ── */}
       {floor === 1 && (
         <div className="grid grid-cols-3 grid-rows-3 gap-2 h-64">
           <BlueprintRoom id="IGD-101" title="TRIASE UTAMA" patient="Tn. Bambang P." isActive={true} selectedRoom={selectedRoom} setSelectedRoom={setSelectedRoom} className="col-span-2 row-span-2" doorPosition="bottom">
@@ -200,14 +324,12 @@ function FloorPlan({ floor, selectedRoom, setSelectedRoom }) {
               ))}
             </div>
           </BlueprintRoom>
-
           <BlueprintRoom id="IGD-102" title="RESUSITASI" status="Kosong (Standby)" isActive={false} selectedRoom={selectedRoom} setSelectedRoom={setSelectedRoom} className="col-span-1 row-span-2" doorPosition="bottom">
             <div className="w-7 h-12 border-2 border-red-300 bg-red-50 rounded-sm flex flex-col items-center p-0.5">
               <div className="w-full h-3 border-b-2 border-red-200 bg-white rounded-t-sm" />
               <span className="text-[7px] mt-1 text-red-500 font-bold">AED</span>
             </div>
           </BlueprintRoom>
-
           <div className="col-span-3 row-span-1 bg-slate-200/60 border-2 border-dashed border-slate-400 flex flex-col items-center justify-center rounded">
             <span className="text-[10px] font-black text-slate-600 tracking-widest">LOBBY & RECEPTION</span>
             <div className="flex gap-4 mt-1 opacity-60 font-mono text-[7px] font-bold">
@@ -218,7 +340,6 @@ function FloorPlan({ floor, selectedRoom, setSelectedRoom }) {
         </div>
       )}
 
-      {/* ── LAYOUT ARSITEKTUR LANTAI 2 (ICU) ── */}
       {floor === 2 && (
         <div className="grid grid-cols-4 grid-rows-3 gap-2 h-64">
           <BlueprintRoom id="ICU-201" title="ICU 01 (ISO)" patient="Tn. Ahmad B." isActive={true} selectedRoom={selectedRoom} setSelectedRoom={setSelectedRoom} className="col-span-2 row-span-2" door="bottom">
@@ -227,14 +348,12 @@ function FloorPlan({ floor, selectedRoom, setSelectedRoom }) {
               <div className="absolute top-1 -right-3 w-2 h-4 bg-slate-700 border border-slate-800 rounded-sm animate-pulse flex items-center justify-center"><div className="w-1 h-1 bg-emerald-400 rounded-full"/></div>
             </div>
           </BlueprintRoom>
-
           <BlueprintRoom id="ICU-202" title="ICU 02 (ISO)" patient="Ny. Ratna G." isActive={true} selectedRoom={selectedRoom} setSelectedRoom={setSelectedRoom} className="col-span-2 row-span-2" door="bottom">
             <div className="relative w-10 h-14 border-2 border-purple-300 bg-purple-50 rounded flex flex-col p-0.5">
               <div className="w-full h-3 border-b-2 border-purple-200 bg-white rounded-t-sm" />
               <div className="absolute top-1 -right-3 w-2 h-4 bg-slate-700 border border-slate-800 rounded-sm animate-pulse flex items-center justify-center"><div className="w-1 h-1 bg-emerald-400 rounded-full"/></div>
             </div>
           </BlueprintRoom>
-
           <div className="col-span-4 row-span-1 bg-sky-100/50 border-2 border-slate-400 flex items-center justify-between px-4 rounded">
             <span className="text-[10px] font-black text-sky-700 tracking-widest">STERILE CORRIDOR</span>
             <div className="w-16 h-8 border-2 border-sky-400 bg-white flex items-center justify-center text-[7px] font-black text-sky-600 text-center leading-tight rounded-sm shadow-sm">NURSE<br/>STATION</div>
@@ -242,7 +361,6 @@ function FloorPlan({ floor, selectedRoom, setSelectedRoom }) {
         </div>
       )}
 
-      {/* ── LAYOUT ARSITEKTUR LANTAI 3 (RAWAT INAP) ── */}
       {floor === 3 && (
         <div className="grid grid-cols-3 grid-rows-4 gap-2 h-64">
           <BlueprintRoom id="RNP-301" title="VVIP MELATI" patient="Ibu Siti K." isActive={true} selectedRoom={selectedRoom} setSelectedRoom={setSelectedRoom} className="col-span-3 row-span-2" door="bottom">
@@ -253,11 +371,9 @@ function FloorPlan({ floor, selectedRoom, setSelectedRoom }) {
               <div className="w-16 h-10 border-2 border-dashed border-slate-400 bg-slate-200/50 flex items-center justify-center text-[6px] text-slate-500 font-bold rounded-sm text-center leading-tight">SOFA /<br/>FAMILY AREA</div>
             </div>
           </BlueprintRoom>
-
           <div className="col-span-3 row-span-1 bg-slate-200/50 border-y-2 border-slate-400 flex flex-col items-center justify-center">
             <span className="text-[9px] font-black text-slate-500 tracking-widest">MAIN HALLWAY</span>
           </div>
-
           <BlueprintRoom id="RNP-302" title="KAMAR ANGGREK" status="Tersedia" isActive={false} selectedRoom={selectedRoom} setSelectedRoom={setSelectedRoom} className="col-span-3 row-span-1" door="top">
             <div className="flex gap-6 mt-1">
               {[1,2].map(i => (
@@ -290,6 +406,7 @@ export default function HospitalMap({ selectedFloor, setSelectedFloor, setSelect
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)]
                       bg-[size:25px_25px] opacity-40 pointer-events-none z-0" />
 
+      {/* Header Badge */}
       <div className="absolute top-2 md:top-4 left-1/2 -translate-x-1/2 z-30 text-center pointer-events-none w-full">
         <span className="text-[9px] md:text-[10px] bg-sky-900 border border-sky-700 text-sky-100 font-bold px-4 py-1.5 rounded-full tracking-wider shadow-md">
           {selectedFloor === null
@@ -298,79 +415,89 @@ export default function HospitalMap({ selectedFloor, setSelectedFloor, setSelect
         </span>
       </div>
 
-      {selectedFloor !== null && (
-        <button
-          onClick={handleBackToGedung}
-          className="absolute bottom-4 right-4 bg-sky-600 hover:bg-sky-700 text-white font-bold
-                     px-4 py-2 rounded-xl text-[10px] md:text-xs
-                     transition-all shadow-lg z-30 flex items-center gap-1.5"
-        >
-          🔍 KEMBALI KE GEDUNG 3D
-        </button>
-      )}
+      {/* ══ LAYOUT UTAMA ══
+          View gedung: gedung 3D di kiri + panel tombol di kanan
+          View denah: denah di atas + tombol lantai di bawah  */}
+      <div className={`
+        flex z-10 items-center gap-12 md:gap-20
+        ${selectedFloor === null ? 'flex-row' : 'flex-col'}
+      `}>
 
-      <div
-        className="w-full max-w-sm md:max-w-md aspect-square flex items-center justify-center relative z-10"
-        style={{ perspective: '1600px' }}
-      >
-        {selectedFloor === null && <HoverCard floor={hoveredFloor} />}
-
+        {/* ── GEDUNG 3D / DENAH ── */}
         <div
-          className="w-full h-full flex items-center justify-center transition-all duration-1000 ease-in-out relative"
-          style={{
-            transformStyle: 'preserve-3d',
-            transform: selectedFloor === null
-              ? 'rotateX(60deg) rotateZ(-45deg) translateY(40px) translateX(-10px)'
-              : 'rotateX(0deg) rotateZ(0deg) translateY(0px) translateX(0px)',
-          }}
+          className="w-full max-w-sm md:max-w-md aspect-square flex items-center justify-center relative"
+          style={{ perspective: '1600px' }}
         >
+          {selectedFloor === null && <HoverCard floor={hoveredFloor} />}
 
-          {selectedFloor === null && (
-            <div className="absolute w-44 h-44 relative" style={{ transformStyle: 'preserve-3d' }}>
-              
-              <div className="absolute w-72 h-72 bg-zinc-700 rounded-xl shadow-[20px_30px_40px_rgba(0,0,0,0.25)] border-b-8 border-r-8 border-zinc-900 -left-14 -top-14 pointer-events-none" style={{ transform: 'translateZ(-2px)', transformStyle: 'preserve-3d' }}>
-                <div className="absolute top-0 left-0 right-0 h-14 bg-emerald-500 rounded-t-sm border-b-2 border-emerald-700" />
-                <div className="absolute top-14 left-0 w-14 bottom-16 bg-emerald-500 border-r-2 border-emerald-700" />
-                <div className="absolute bottom-0 left-0 right-0 h-16 bg-zinc-800 flex items-center justify-around px-4">
-                  <div className="w-8 h-1.5 bg-white/70 rounded-full" />
-                  <div className="w-8 h-1.5 bg-white/70 rounded-full" />
-                  <div className="w-8 h-1.5 bg-white/70 rounded-full" />
-                  <div className="w-8 h-1.5 bg-white/70 rounded-full" />
+          <div
+            className="w-full h-full flex items-center justify-center transition-all duration-1000 ease-in-out relative"
+            style={{
+              transformStyle: 'preserve-3d',
+              transform: selectedFloor === null
+                ? 'rotateX(60deg) rotateZ(-45deg) translateY(40px) translateX(-10px)'
+                : 'rotateX(0deg) rotateZ(0deg) translateY(0px) translateX(0px)',
+            }}
+          >
+            {selectedFloor === null && (
+              <div className="absolute w-44 h-44 relative" style={{ transformStyle: 'preserve-3d' }}>
+                
+                <div className="absolute w-72 h-72 bg-zinc-700 rounded-xl shadow-[20px_30px_40px_rgba(0,0,0,0.25)] border-b-8 border-r-8 border-zinc-900 -left-14 -top-14 pointer-events-none" style={{ transform: 'translateZ(-2px)', transformStyle: 'preserve-3d' }}>
+                  <div className="absolute top-0 left-0 right-0 h-14 bg-emerald-500 rounded-t-sm border-b-2 border-emerald-700" />
+                  <div className="absolute top-14 left-0 w-14 bottom-16 bg-emerald-500 border-r-2 border-emerald-700" />
+                  <div className="absolute bottom-0 left-0 right-0 h-16 bg-zinc-800 flex items-center justify-around px-4">
+                    <div className="w-8 h-1.5 bg-white/70 rounded-full" />
+                    <div className="w-8 h-1.5 bg-white/70 rounded-full" />
+                    <div className="w-8 h-1.5 bg-white/70 rounded-full" />
+                    <div className="w-8 h-1.5 bg-white/70 rounded-full" />
+                  </div>
                 </div>
+
+                <div className="absolute bottom-[-30px] right-[-10px] w-8 h-12 pointer-events-none" style={{ transform: 'translateZ(0px)', transformStyle: 'preserve-3d' }}>
+                  <div className="absolute inset-0 bg-white rounded-sm border border-slate-300" />
+                  <div className="absolute left-0 bottom-[-16px] w-8 h-4 bg-slate-100 origin-top flex items-center justify-center border-b border-slate-300" style={{ transform: 'rotateX(-90deg)' }}>
+                    <div className="w-6 h-2 bg-sky-800 rounded-sm" />
+                  </div>
+                  <div className="absolute right-[-16px] top-0 w-4 h-12 bg-slate-200 origin-left border-r border-b border-slate-400 flex items-center justify-center" style={{ transform: 'rotateY(90deg)' }}>
+                    <div className="w-full h-1.5 bg-red-500" />
+                  </div>
+                </div>
+
+                {[3, 2, 1].map((f) => (
+                  <BuildingFloor
+                    key={f}
+                    floor={f}
+                    zOffset={zMap[f]}
+                    onClick={() => setSelectedFloor(f)}
+                    onEnter={() => setHoveredFloor(f)}
+                    onLeave={() => setHoveredFloor(null)}
+                  />
+                ))}
               </div>
+            )}
 
-              <div className="absolute bottom-[-30px] right-[-10px] w-8 h-12 pointer-events-none" style={{ transform: 'translateZ(0px)', transformStyle: 'preserve-3d' }}>
-                <div className="absolute inset-0 bg-white rounded-sm border border-slate-300" />
-                <div className="absolute left-0 bottom-[-16px] w-8 h-4 bg-slate-100 origin-top flex items-center justify-center border-b border-slate-300" style={{ transform: 'rotateX(-90deg)' }}>
-                  <div className="w-6 h-2 bg-sky-800 rounded-sm" />
-                </div>
-                <div className="absolute right-[-16px] top-0 w-4 h-12 bg-slate-200 origin-left border-r border-b border-slate-400 flex items-center justify-center" style={{ transform: 'rotateY(90deg)' }}>
-                   <div className="w-full h-1.5 bg-red-500" />
-                </div>
-              </div>
-
-              {[3, 2, 1].map((f) => (
-                <BuildingFloor
-                  key={f}
-                  floor={f}
-                  zOffset={zMap[f]}
-                  onClick={() => setSelectedFloor(f)}
-                  onEnter={() => setHoveredFloor(f)}
-                  onLeave={() => setHoveredFloor(null)}
-                />
-              ))}
-            </div>
-          )}
-
-          {selectedFloor !== null && (
-            <FloorPlan
-              floor={selectedFloor}
-              selectedRoom={selectedRoom}
-              setSelectedRoom={setSelectedRoom}
-            />
-          )}
-
+            {selectedFloor !== null && (
+              <FloorPlan
+                floor={selectedFloor}
+                selectedRoom={selectedRoom}
+                setSelectedRoom={setSelectedRoom}
+              />
+            )}
+          </div>
         </div>
+
+        {/* ── FLOOR SELECTOR PANEL ──
+            Di samping gedung saat view 3D, di bawah saat view denah */}
+        <FloorSelectorPanel
+          selectedFloor={selectedFloor}
+          onSelectFloor={(f) => {
+            setSelectedFloor(f);
+            setSelectedRoom && setSelectedRoom(null);
+          }}
+          onBack={handleBackToGedung}
+          variant={selectedFloor === null ? 'side' : 'bottom'}
+        />
+
       </div>
     </div>
   );
