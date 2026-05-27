@@ -190,7 +190,7 @@ function FloorSelectorPanel({ selectedFloor, onSelectFloor, onBack, variant = 's
       className={`
         flex z-20
         ${isSide
-          ? 'flex-col gap-2 w-44'
+          ? 'flex-col gap-2 w-full max-w-[180px] md:w-44'
           : 'flex-row gap-2 justify-center w-full max-w-sm'}
       `}
     >
@@ -401,7 +401,7 @@ export default function HospitalMap({ selectedFloor, setSelectedFloor, setSelect
   const zMap = { 1: 0, 2: 56, 3: 112 };
 
   return (
-    <div className="w-full h-full flex flex-col items-center justify-center p-2 md:p-4 pt-16 md:pt-20 text-slate-700 relative overflow-hidden select-none bg-sky-50/10">
+    <div className="w-full h-full flex flex-col items-center justify-center p-2 md:p-4 pt-16 md:pt-20 text-slate-700 relative overflow-hidden overflow-x-hidden select-none bg-sky-50/10">
 
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#e2e8f0_1px,transparent_1px),linear-gradient(to_bottom,#e2e8f0_1px,transparent_1px)]
                       bg-[size:25px_25px] opacity-40 pointer-events-none z-0" />
@@ -419,13 +419,13 @@ export default function HospitalMap({ selectedFloor, setSelectedFloor, setSelect
           View gedung: gedung 3D di kiri + panel tombol di kanan
           View denah: denah di atas + tombol lantai di bawah  */}
       <div className={`
-        flex z-10 items-center gap-12 md:gap-20
-        ${selectedFloor === null ? 'flex-row' : 'flex-col'}
+        flex z-10 items-center gap-4 md:gap-12
+        ${selectedFloor === null ? 'flex-col md:flex-row' : 'flex-col'}
       `}>
 
         {/* ── GEDUNG 3D / DENAH ── */}
         <div
-          className="w-full max-w-sm md:max-w-md aspect-square flex items-center justify-center relative"
+          className="w-full max-w-[260px] md:max-w-sm aspect-square flex items-center justify-center relative"
           style={{ perspective: '1600px' }}
         >
           {selectedFloor === null && <HoverCard floor={hoveredFloor} />}
