@@ -191,7 +191,7 @@ function FloorSelectorPanel({ selectedFloor, onSelectFloor, onBack, variant = 's
         flex z-20
         ${isSide
           ? 'flex-col gap-2 w-full max-w-[180px] md:w-44'
-          : 'flex-row gap-2 justify-center w-full max-w-sm'}
+          : 'flex-col gap-2 w-full max-w-xs'}
       `}
     >
       {/* Label Panel */}
@@ -211,7 +211,7 @@ function FloorSelectorPanel({ selectedFloor, onSelectFloor, onBack, variant = 's
             onClick={() => onSelectFloor(floor)}
             className={`
               flex items-center gap-2.5 rounded-xl border-2 transition-all duration-200 text-left group
-              ${isSide ? 'px-3 py-2.5 w-full' : 'px-3 py-2 flex-1'}
+              ${isSide ? 'px-3 py-2.5 w-full' : 'px-3 py-2 w-full'}
               ${isActive
                 ? `${activeBorder} ${activeBg} shadow-md`
                 : 'border-slate-200 bg-white/80 hover:border-slate-300 hover:bg-white hover:shadow-sm active:scale-95'}
