@@ -14,19 +14,63 @@ export default function Home() {
     total_igd_queue: 14,
     icu_vacant_beds: 1,
     queue_trend: [],
-    ambulance: { total: 5, standby: 3 },
+    ambulance: { 
+      total: 5, 
+      standby: 3,
+      gps: [
+        { id: 'AMB-01', location: 'Jl. Kaliurang Km 5', status: 'Menuju TKP' },
+        { id: 'AMB-02', location: 'Base RS (Siaga)', status: 'Standby' }
+      ]
+    },
     doctors: []
   });
 
-  // 1. Polling Data Telemetri Medis (Kamar)
+  // Efek Rute GPS Ambulans
+  useEffect(() => {
+    const ruteJalan = [
+      'Jl. Kaliurang Km 5', 
+      'Perempatan Kentungan', 
+      'Ringroad Utara', 
+      'Jl. Monjali', 
+      'RSUP Dr. Sardjito',
+      'Gerbang Utama Kampus'
+    ];
+    let step = 0;
+    
+    const gpsInterval = setInterval(() => {
+      step = (step + 1) % ruteJalan.length;
+      setOperationalData(prev => ({
+        ...prev,
+        ambulance: {
+          ...prev.ambulance,
+          gps: prev.ambulance.gps?.map(loc => {
+            if (loc.id === 'AMB-01') {
+               return { ...loc, location: ruteJalan[step] };
+            }
+            return loc;
+          }) || []
+        }
+      }));
+    }, 4000);
+    return () => clearInterval(gpsInterval);
+  }, []);
+
+  // Polling Sensor Ruangan (Dengan penanganan error HTML)
   useEffect(() => {
     let interval;
     if (selectedRoom) {
       const fetchRoomData = () => {
         fetch(`/api/rooms/${selectedRoom}`)
-          .then((res) => res.json())
+          .then((res) => {
+            if (!res.ok) throw new Error("Ruangan tidak ditemukan di API");
+            return res.json();
+          })
           .then((data) => setRoomData(data))
-          .catch((err) => console.error("Error telemetry fetch:", err));
+          .catch((err) => {
+            console.error("Error telemetry fetch:", err);
+            // Mencegah crash jika API gagal (misal RNP-301 belum ada)
+            setRoomData({ error: "Data sensor ruangan ini belum tersedia di API" }); 
+          });
       };
       fetchRoomData();
       interval = setInterval(fetchRoomData, 3000);
@@ -36,7 +80,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [selectedRoom]);
 
-  // 2. Polling Data Operasional Umum
+  // Polling Data Operasional
   useEffect(() => {
     const fetchOperationalData = () => {
       fetch('/api/telemetry')
@@ -46,7 +90,10 @@ export default function Home() {
         })
         .then((data) => {
           if (data && !data.error) {
-            setOperationalData(data);
+            setOperationalData(prev => ({
+              ...data,
+              ambulance: { ...data.ambulance, gps: prev.ambulance.gps } 
+            }));
           }
         })
         .catch((err) => console.error("Error operational fetch:", err));
@@ -59,147 +106,186 @@ export default function Home() {
   return (
     <div className="flex flex-col md:flex-row min-h-screen md:h-screen w-screen bg-[#f4f6f9] text-slate-700 font-sans overflow-y-auto md:overflow-hidden">
       
-      {/* ================= SIDEBAR MENU KIRI ================= */}
-      <div className="w-full md:w-64 bg-[#0f172a] text-slate-300 flex flex-col justify-between shadow-xl flex-shrink-0">
-        <div>
-          {/* Logo Brand */}
-          <div className="p-4 md:p-5 border-b border-slate-800 flex items-center justify-between md:justify-start gap-3 bg-[#1e293b]">
+      {/* ================= SIDEBAR MENU ================= */}
+      <div className="w-full md:w-64 bg-indigo-950 text-indigo-100 flex flex-col justify-between shadow-2xl flex-shrink-0">
+        <div className="flex flex-col h-full">
+          <div className="p-4 md:p-5 border-b border-indigo-900 flex items-center justify-between md:justify-start gap-3 bg-indigo-900/50">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-base md:text-lg shadow-md">
+              <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white font-black text-base md:text-lg shadow-lg shadow-blue-500/30">
                 M
               </div>
               <div>
-                <h1 className="text-xs md:text-sm font-bold text-white tracking-wide">MediCenter.OS</h1>
-                <p className="text-[9px] md:text-[10px] text-slate-400 font-medium">v2.7 - Enterprise Production</p>
+                <h1 className="text-xs md:text-sm font-black text-white tracking-wide">MediCenter.OS</h1>
+                <p className="text-[9px] md:text-[10px] text-cyan-400 font-bold uppercase tracking-wider">v3.0 - Enterprise</p>
               </div>
             </div>
-            <span className="md:hidden text-[9px] bg-blue-500/20 text-blue-400 font-mono px-2 py-0.5 rounded-full">LIVE</span>
+            <span className="md:hidden text-[9px] bg-cyan-500/20 text-cyan-400 font-mono px-2 py-0.5 rounded-full animate-pulse">LIVE</span>
           </div>
 
-          {/* Navigasi Link Menu (Scrollable Horizontal di HP, Vertikal di Desktop) */}
-          <div className="p-3 md:p-4 flex flex-row md:flex-col gap-1 overflow-x-auto md:overflow-x-visible border-b border-slate-800 md:border-b-0 whitespace-nowrap scrollbar-none">
-            <button 
-              onClick={() => setActiveMenu('dashboard')}
-              className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] md:text-xs font-semibold transition-all ${
-                activeMenu === 'dashboard' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800/60'
-              }`}
-            >
-              <span>📊</span> Dashboard Spasial
+          <div className="p-3 md:p-4 flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible border-b border-indigo-900 md:border-b-0 whitespace-nowrap scrollbar-none">
+            <button onClick={() => setActiveMenu('dashboard')} className={`flex-shrink-0 flex items-center gap-3 px-3 py-3 rounded-xl text-[11px] md:text-xs font-bold transition-all ${activeMenu === 'dashboard' ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-indigo-900/60 text-indigo-300'}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+              Dashboard Spasial
             </button>
-            <button onClick={() => setActiveMenu('farmasi')} className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] md:text-xs font-semibold transition-all ${activeMenu === 'farmasi' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800/60'}`}><span>💊</span> Apotek &amp; Farmasi</button>
-            <button onClick={() => setActiveMenu('personalia')} className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] md:text-xs font-semibold transition-all ${activeMenu === 'personalia' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800/60'}`}><span>👤</span> Tim Medis</button>
-            <button onClick={() => setActiveMenu('keuangan')} className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] md:text-xs font-semibold transition-all ${activeMenu === 'keuangan' ? 'bg-blue-600 text-white shadow-md' : 'hover:bg-slate-800/60'}`}><span>💼</span> Finansial</button>
+            <button onClick={() => setActiveMenu('farmasi')} className={`flex-shrink-0 flex items-center gap-3 px-3 py-3 rounded-xl text-[11px] md:text-xs font-bold transition-all ${activeMenu === 'farmasi' ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-indigo-900/60 text-indigo-300'}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+              Apotek & Farmasi
+            </button>
+            <button onClick={() => setActiveMenu('personalia')} className={`flex-shrink-0 flex items-center gap-3 px-3 py-3 rounded-xl text-[11px] md:text-xs font-bold transition-all ${activeMenu === 'personalia' ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-indigo-900/60 text-indigo-300'}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+              Profil Layanan Medis
+            </button>
+            <button onClick={() => setActiveMenu('keuangan')} className={`flex-shrink-0 flex items-center gap-3 px-3 py-3 rounded-xl text-[11px] md:text-xs font-bold transition-all ${activeMenu === 'keuangan' ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-indigo-900/60 text-indigo-300'}`}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+              Finansial
+            </button>
           </div>
-        </div>
 
-        {/* User Profile */}
-        <div className="hidden md:flex p-4 border-t border-slate-800 items-center gap-3 bg-[#131c2e]">
-          <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-xs font-bold text-blue-400">UGM</div>
-          <div>
-            <p className="text-xs font-bold text-white">Dosen Penguji</p>
-            <p className="text-[10px] text-slate-400">Teknik Fisika UGM</p>
+          <div className="hidden md:flex flex-col flex-1 justify-end p-4">
+            <div className="bg-indigo-900/30 border border-indigo-800/50 rounded-2xl p-4 backdrop-blur-sm">
+              <p className="text-[10px] font-black text-cyan-400 mb-3 uppercase tracking-widest flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span> Live Fleet Tracker
+              </p>
+              <div className="flex flex-col gap-3">
+                {operationalData.ambulance.gps?.map(loc => (
+                  <div key={loc.id} className="flex justify-between items-center bg-indigo-950/80 p-3 rounded-xl border border-indigo-800 shadow-inner">
+                    <div>
+                      <p className="text-white font-bold text-[10px]">{loc.id}</p>
+                      <p className="text-indigo-300 text-[9px] mt-1 flex items-center gap-1">
+                        <svg className="w-3 h-3 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        {loc.location}
+                      </p>
+                    </div>
+                    <span className={`px-2 py-1 rounded-md font-black text-[8px] uppercase tracking-wider ${loc.status === 'Menuju TKP' ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.2)] animate-pulse' : 'bg-slate-800 text-slate-400'}`}>
+                      {loc.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ================= KONTEN UTAMA SEBELAH KANAN ================= */}
+      {/* ================= KONTEN UTAMA ================= */}
       <div className="flex-1 flex flex-col min-w-0">
-        
-        {/* Top Header Navbar */}
-        <div className="h-12 md:h-14 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between shadow-sm flex-shrink-0">
+        <div className="h-12 md:h-16 bg-white border-b border-slate-200 px-4 md:px-6 flex items-center justify-between shadow-sm flex-shrink-0 z-10">
           <div className="text-[11px] md:text-xs font-medium text-slate-500">
-            Sistem Utama / <span className="text-blue-600 font-bold uppercase tracking-wider">{activeMenu === 'farmasi' ? 'Gudang Farmasi & Apotek' : activeMenu === 'personalia' ? 'Personalia Tim Medis' : activeMenu === 'keuangan' ? 'Manajer Keuangan' : 'Dashboard Spasial IoT'}</span>
+            Sistem Utama / <span className="text-blue-600 font-bold uppercase tracking-wider">{activeMenu === 'farmasi' ? 'Gudang Farmasi & Apotek' : activeMenu === 'personalia' ? 'Spesialis & Layanan Medis' : activeMenu === 'keuangan' ? 'Manajer Keuangan' : 'DASHBOARD SPASIAL IOT'}</span>
           </div>
-          <div className="text-[9px] md:text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
-            ● IoT Live Synchronized
+          <div className="text-[9px] md:text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-200 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> IoT Live Synchronized
           </div>
         </div>
 
-        {/* Workspace Area */}
-        <div className="flex-1 p-4 md:p-6 overflow-y-auto">
+        <div className="flex-1 p-4 md:p-6 overflow-y-auto bg-slate-50">
           
           {/* ================= 1. MODUL DASHBOARD UTAMA ================= */}
           {activeMenu === 'dashboard' && (
-            <div className="flex flex-col gap-5 animate-fade-in">
-              {/* KARTU METRIK ATAS */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm min-w-0">
+            <div className="flex flex-col gap-6 animate-fade-in">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                
+                <div className="bg-gradient-to-br from-rose-500 to-orange-500 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-rose-500/30 min-w-0 border border-white/20">
                   <div className="min-w-0">
-                    <p className="text-[10px] md:text-xs text-slate-400 font-bold truncate">Antrean IGD</p>
-                    <p className="text-sm md:text-xl font-black text-slate-800 mt-0.5 font-mono truncate">{operationalData.total_igd_queue} <span className="text-[9px] font-normal text-slate-400">Pasien</span></p>
+                    <p className="text-[10px] md:text-xs text-white/80 font-black truncate uppercase tracking-widest">Antrean IGD</p>
+                    <p className="text-xl md:text-3xl font-black text-white mt-1 font-mono truncate">{operationalData.total_igd_queue} <span className="text-[10px] font-bold text-white/70">Pasien</span></p>
                   </div>
-                  <div className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center text-sm flex-shrink-0">🚨</div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white flex-shrink-0 shadow-inner">
+                    <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                  </div>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm min-w-0">
+                <div className="bg-gradient-to-br from-emerald-500 to-teal-500 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-emerald-500/30 min-w-0 border border-white/20">
                   <div className="min-w-0">
-                    <p className="text-[10px] md:text-xs text-slate-400 font-bold truncate">Sisa Bed ICU</p>
-                    <p className="text-sm md:text-xl font-black text-slate-800 mt-0.5 font-mono truncate">{operationalData.icu_vacant_beds} <span className="text-[9px] font-normal text-slate-400">Bed</span></p>
+                    <p className="text-[10px] md:text-xs text-white/80 font-black truncate uppercase tracking-widest">Sisa Bed ICU</p>
+                    <p className="text-xl md:text-3xl font-black text-white mt-1 font-mono truncate">{operationalData.icu_vacant_beds} <span className="text-[10px] font-bold text-white/70">Bed</span></p>
                   </div>
-                  <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-sm flex-shrink-0">🛏️</div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white flex-shrink-0 shadow-inner">
+                    <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                  </div>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm min-w-0">
+                <div className="bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-blue-500/30 min-w-0 border border-white/20">
                   <div className="min-w-0">
-                    <p className="text-[10px] md:text-xs text-slate-400 font-bold truncate">Ambulans Siaga</p>
-                    <p className="text-sm md:text-xl font-black text-slate-800 mt-0.5 font-mono truncate">
-                      {operationalData.ambulance.standby}<span className="text-[10px] font-normal text-slate-400">/{operationalData.ambulance.total} Unit</span>
+                    <p className="text-[10px] md:text-xs text-white/80 font-black truncate uppercase tracking-widest">Ambulans Siaga</p>
+                    <p className="text-xl md:text-3xl font-black text-white mt-1 font-mono truncate">
+                      {operationalData.ambulance.standby}<span className="text-[10px] md:text-sm font-bold text-white/70">/{operationalData.ambulance.total} Unit</span>
                     </p>
                   </div>
-                  <div className="w-8 h-8 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center text-sm flex-shrink-0">🚑</div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white flex-shrink-0 shadow-inner">
+                    <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"></path></svg>
+                  </div>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between shadow-sm min-w-0">
+                <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-indigo-500/30 min-w-0 border border-white/20">
                   <div className="min-w-0">
-                    <p className="text-[10px] md:text-xs text-slate-400 font-bold truncate">Status Node</p>
-                    <p className="text-sm md:text-xl font-black text-emerald-600 mt-0.5 font-mono">ONLINE</p>
+                    <p className="text-[10px] md:text-xs text-white/80 font-black truncate uppercase tracking-widest">Status Node</p>
+                    <p className="text-xl md:text-3xl font-black text-white mt-1 font-mono">ONLINE</p>
                   </div>
-                  <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-sm flex-shrink-0">🌐</div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white flex-shrink-0 shadow-inner">
+                    <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"></path></svg>
+                  </div>
                 </div>
               </div>
 
-              {/* SPLIT LAYOUT SPASIAL */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="w-full md:col-span-2 bg-white border border-slate-200 rounded-xl p-3 md:p-5 flex flex-col relative justify-center items-center shadow-sm min-h-[340px] md:min-h-[460px]">
+                <div className="w-full md:col-span-2 bg-white border border-slate-200 rounded-3xl p-3 md:p-5 flex flex-col relative justify-center items-center shadow-xl shadow-slate-200/50 min-h-[340px] md:min-h-[460px] overflow-hidden">
                   {selectedFloor !== null && (
                     <button 
                       onClick={() => { setSelectedFloor(null); setSelectedRoom(null); }}
-                      className="absolute top-3 right-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 px-2.5 py-1 rounded-lg text-[9px] font-bold z-50 shadow-sm"
+                      className="absolute top-4 right-4 bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold z-50 shadow-lg transition-all"
                     >
-                      ⬅ Kembali ke Gedung
+                      ⬅ Gedung Utama
                     </button>
                   )}
                   <HospitalMap selectedFloor={selectedFloor} setSelectedFloor={(floor) => setSelectedFloor(floor)} setSelectedRoom={(room) => setSelectedRoom(room)} selectedRoom={selectedRoom} />
                 </div>
 
-                <div className="w-full md:col-span-1 bg-white border border-slate-200 rounded-xl p-4 md:p-5 flex flex-col gap-4 shadow-sm h-fit">
+                <div className="w-full md:col-span-1 bg-white border border-slate-200 rounded-3xl p-4 md:p-6 flex flex-col gap-6 shadow-xl shadow-slate-200/50 h-fit">
                   {!selectedRoom ? (
-                    <div className="flex flex-col gap-4">
-                      <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl h-40">
-                        <p className="text-[11px] font-bold text-slate-700 mb-2">📊 Tren Kunjungan IGD Per Jam</p>
-                        <ResponsiveContainer width="100%" height="80%">
+                    <div className="flex flex-col gap-6">
+                      <div className="bg-slate-50 border border-slate-100 p-5 rounded-2xl h-48 shadow-inner">
+                        <p className="text-[11px] font-black text-slate-700 mb-4 tracking-wider flex items-center gap-2">
+                           <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                           TREN KUNJUNGAN IGD PER JAM
+                        </p>
+                        {/* Menambahkan minWidth={1} dan minHeight={1} untuk memperbaiki error Recharts */}
+                        <ResponsiveContainer width="100%" height="80%" minWidth={1} minHeight={1}>
                           <BarChart data={operationalData.queue_trend}>
-                            <XAxis dataKey="hour" stroke="#94a3b8" fontSize={8} tickLine={false} />
-                            <Tooltip contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '9px' }} />
-                            <Bar dataKey="pasien" fill="#3b82f6" radius={[3, 3, 0, 0]} />
+                            <XAxis dataKey="hour" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                            <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{ backgroundColor: '#ffffff', border: 'none', borderRadius: '12px', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)', fontSize: '11px', fontWeight: 'bold' }} />
+                            <Bar dataKey="pasien" fill="url(#colorUv)" radius={[6, 6, 0, 0]} />
+                            <defs>
+                              <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={1}/>
+                                <stop offset="95%" stopColor="#6366f1" stopOpacity={1}/>
+                              </linearGradient>
+                            </defs>
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
 
-                      <div className="flex flex-col gap-1.5">
-                        <p className="text-[11px] font-bold text-slate-700">👨‍⚕️ Jadwal Jaga Dokter Hari Ini</p>
-                        <div className="flex flex-col gap-2 overflow-y-auto max-h-[160px] pr-1">
-                          {operationalData.doctors.map((doc, idx) => (
-                            <div key={idx} className="bg-slate-50/80 border border-slate-200 p-2 rounded-lg flex justify-between items-center text-[10px]">
-                              <div className="min-w-0">
-                                <p className="font-bold text-slate-800 truncate">{doc.nama}</p>
-                                <p className="text-[8px] text-slate-400 truncate">{doc.spesialis} • <span className="text-blue-600 font-semibold">{doc.kamar}</span></p>
-                              </div>
-                              <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold flex-shrink-0 ${
-                                doc.status === 'Di Ruangan' ? 'bg-emerald-100 text-emerald-700' : doc.status === 'Operasi' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                              }`}>{doc.status}</span>
+                      <div className="flex flex-col gap-3">
+                        <p className="text-[11px] font-black text-slate-700 tracking-wider uppercase">Layanan Spesialis Unggulan</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-rose-50 border border-rose-100 p-3 rounded-xl flex items-center gap-3 transition hover:shadow-md cursor-pointer">
+                            <div className="w-8 h-8 rounded-full bg-rose-200 flex items-center justify-center text-rose-600">
+                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd"></path></svg>
                             </div>
-                          ))}
+                            <span className="text-[11px] font-bold text-rose-900">Cardiology</span>
+                          </div>
+                          <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-xl flex items-center gap-3 transition hover:shadow-md cursor-pointer">
+                            <div className="w-8 h-8 rounded-full bg-indigo-200 flex items-center justify-center text-indigo-600">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            </div>
+                            <span className="text-[11px] font-bold text-indigo-900">Pediatric</span>
+                          </div>
+                          <div className="bg-emerald-50 border border-emerald-100 p-3 rounded-xl flex items-center gap-3 transition hover:shadow-md cursor-pointer col-span-2">
+                            <div className="w-8 h-8 rounded-full bg-emerald-200 flex items-center justify-center text-emerald-600">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                            </div>
+                            <span className="text-[11px] font-bold text-emerald-900">Orthopedic & Trauma</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -211,50 +297,51 @@ export default function Home() {
             </div>
           )}
 
-          {/* ================= 2. MODUL LENGKAP: FARMASI & RECEPTOR REKOMENDASI ================= */}
+          {/* ================= 2. MODUL LENGKAP: FARMASI ================= */}
           {activeMenu === 'farmasi' && (
             <div className="flex flex-col gap-5 animate-fade-in">
-              {/* Ringkasan Logistik Obat */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-white border p-3 rounded-xl shadow-sm">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Gas Medis O2</p>
-                  <p className="text-base md:text-xl font-black text-slate-800 mt-1 font-mono">180 <span className="text-[10px] font-normal text-slate-500">Tabung</span></p>
-                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1 rounded mt-1 inline-block">● Aman</span>
+                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Gas Medis O2</p>
+                  <p className="text-xl md:text-2xl font-black text-slate-800 mt-1 font-mono">180 <span className="text-[10px] font-normal text-slate-500">Tabung</span></p>
+                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full mt-2 inline-block">● Aman</span>
                 </div>
-                <div className="bg-white border p-3 rounded-xl shadow-sm">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Obat Resusitasi</p>
-                  <p className="text-base md:text-xl font-black text-slate-800 mt-1 font-mono">45 <span className="text-[10px] font-normal text-slate-500">Vial</span></p>
-                  <span className="text-[9px] bg-amber-50 text-amber-700 font-bold px-1 rounded mt-1 inline-block">⚠️ Batas Minimum</span>
+                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Obat Resusitasi</p>
+                  <p className="text-xl md:text-2xl font-black text-slate-800 mt-1 font-mono">45 <span className="text-[10px] font-normal text-slate-500">Vial</span></p>
+                  <span className="text-[9px] bg-amber-50 text-amber-700 font-bold px-2 py-0.5 rounded-full mt-2 inline-block">⚠️ Batas Minimum</span>
                 </div>
-                <div className="bg-white border p-3 rounded-xl shadow-sm">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Cairan Infus</p>
-                  <p className="text-base md:text-xl font-black text-slate-800 mt-1 font-mono">1,240 <span className="text-[10px] font-normal text-slate-500">Pcs</span></p>
-                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-1 rounded mt-1 inline-block">● Optimal</span>
+                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Cairan Infus</p>
+                  <p className="text-xl md:text-2xl font-black text-slate-800 mt-1 font-mono">1,240 <span className="text-[10px] font-normal text-slate-500">Pcs</span></p>
+                  <span className="text-[9px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full mt-2 inline-block">● Optimal</span>
                 </div>
-                <div className="bg-white border p-3 rounded-xl shadow-sm">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Antrean Resep</p>
-                  <p className="text-base md:text-xl font-black text-purple-700 mt-1 font-mono">4 <span className="text-[10px] font-normal text-slate-500">Racikan</span></p>
-                  <span className="text-[9px] bg-purple-50 text-purple-700 font-bold px-1 rounded mt-1 inline-block">⏱️ Proses Apoteker</span>
+                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Antrean Resep</p>
+                  <p className="text-xl md:text-2xl font-black text-indigo-700 mt-1 font-mono">4 <span className="text-[10px] font-normal text-slate-500">Racikan</span></p>
+                  <span className="text-[9px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full mt-2 inline-block animate-pulse">⏱️ Proses Apoteker</span>
                 </div>
               </div>
 
-              {/* Tabel Manajemen Stok */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col gap-3">
-                <div className="border-b pb-2">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide text-blue-600">📋 Sistem Inventaris &amp; Batas Reorder Otomatis</h3>
-                  <p className="text-[10px] text-slate-400 mt-0.5">Data terintegrasi dengan sensor berat timbangan digital rak farmasi.</p>
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col gap-4">
+                <div className="border-b pb-3 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
+                  <div>
+                    <h3 className="text-xs font-bold uppercase tracking-wide text-indigo-600">Sistem Inventaris &amp; Batas Reorder Otomatis</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Data terintegrasi dengan sensor berat timbangan digital rak farmasi.</p>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-[11px] border-collapse">
                     <thead>
-                      <tr className="bg-slate-50 border-b text-slate-500 font-bold">
-                        <th className="p-2">SKU Kode</th><th className="p-2">Nama Komoditas Obat</th><th className="p-2">Kategori</th><th className="p-2">Stok Sekarang</th><th className="p-2">Status Urgensi</th>
+                      <tr className="bg-slate-50 border-y text-slate-500 font-bold">
+                        <th className="p-3">SKU Kode</th><th className="p-3">Nama Komoditas Obat</th><th className="p-3">Kategori</th><th className="p-3">Stok Sekarang</th><th className="p-3">Status Urgensi</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y text-slate-600 font-medium">
-                      <tr className="hover:bg-slate-50/50"><td className="p-2 font-mono text-blue-600 font-bold">O2-PORTABLE-12</td><td className="p-2 font-bold text-slate-800">Oksigen Kompresi Tabung Mini</td><td className="p-2">Gas Medis Darurat</td><td className="p-2 font-mono">45 Unit</td><td className="p-2"><span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded">SUPPLY OPTIMAL</span></td></tr>
-                      <tr className="hover:bg-slate-50/50"><td className="p-2 font-mono text-blue-600 font-bold">INJ-EPIN-1MG</td><td className="p-2 font-bold text-slate-800">Epinephrine Injection 1mg/mL</td><td className="p-2">Obat Jantung Kritis</td><td className="p-2 font-mono text-amber-600">18 Ampul</td><td className="p-2"><span className="bg-amber-100 text-amber-800 text-[9px] font-bold px-1.5 py-0.5 rounded animate-pulse">CRITICAL RESTOCK</span></td></tr>
-                      <tr className="hover:bg-slate-50/50"><td className="p-2 font-mono text-blue-600 font-bold">INF-SALINE-500</td><td className="p-2 font-bold text-slate-800">NaCl 0.9% Cairan Infus 500ml</td><td className="p-2">Cairan Kristaloid</td><td className="p-2 font-mono">840 Pcs</td><td className="p-2"><span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-1.5 py-0.5 rounded">SUPPLY OPTIMAL</span></td></tr>
+                      <tr className="hover:bg-slate-50 transition-colors"><td className="p-3 font-mono text-indigo-600 font-bold">O2-PORTABLE-12</td><td className="p-3 font-bold text-slate-800">Oksigen Kompresi Tabung Mini</td><td className="p-3">Gas Medis Darurat</td><td className="p-3 font-mono">45 Unit</td><td className="p-3"><span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-1 rounded">SUPPLY OPTIMAL</span></td></tr>
+                      <tr className="hover:bg-slate-50 transition-colors"><td className="p-3 font-mono text-indigo-600 font-bold">INJ-EPIN-1MG</td><td className="p-3 font-bold text-slate-800">Epinephrine Injection 1mg/mL</td><td className="p-3">Obat Jantung Kritis</td><td className="p-3 font-mono text-rose-600">18 Ampul</td><td className="p-3"><span className="bg-rose-100 text-rose-800 text-[9px] font-bold px-2 py-1 rounded animate-pulse">CRITICAL RESTOCK</span></td></tr>
+                      <tr className="hover:bg-slate-50 transition-colors"><td className="p-3 font-mono text-indigo-600 font-bold">INF-SALINE-500</td><td className="p-3 font-bold text-slate-800">NaCl 0.9% Cairan Infus 500ml</td><td className="p-3">Cairan Kristaloid</td><td className="p-3 font-mono">840 Pcs</td><td className="p-3"><span className="bg-emerald-100 text-emerald-800 text-[9px] font-bold px-2 py-1 rounded">SUPPLY OPTIMAL</span></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -262,96 +349,110 @@ export default function Home() {
             </div>
           )}
 
-          {/* ================= 3. MODUL LENGKAP: TIM MEDIS / PERSONALIA DOKTER ================= */}
+          {/* ================= 3. MODUL LENGKAP: TIM MEDIS ================= */}
           {activeMenu === 'personalia' && (
             <div className="flex flex-col gap-5 animate-fade-in">
-              {/* Grid Personalia Dokter Jaga */}
-              <div className="border-b pb-2">
-                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide text-slate-800">👨‍⚕️ Manajemen Alokasi &amp; Penugasan Staf Medis</h3>
-                <p className="text-[10px] text-slate-400 mt-0.5">Sistem Concurrency Guard aktif mencegah bentrok jadwal operasi.</p>
+              <div className="border-b border-slate-200 pb-3">
+                <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">👨‍⚕️ Profil Layanan &amp; Penugasan Spesialis</h3>
+                <p className="text-[11px] text-slate-500 mt-1">Informasi lengkap terkait dokter spesialis, jadwal, dan deskripsi layanan klinis.</p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Dokter 1 */}
-                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-between gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="bg-white border border-rose-100 p-5 rounded-2xl shadow-md flex flex-col justify-between gap-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-extrabold text-xs text-slate-800">dr. Harianto, Sp.JP</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Spesialis Jantung &amp; Pembuluh Darah</p>
+                      <p className="font-black text-sm text-slate-800">dr. Harianto, Sp.JP</p>
+                      <p className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-full mt-2 inline-block flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd"></path></svg>
+                        Cardiology Center
+                      </p>
                     </div>
-                    <span className="text-base">❤️</span>
                   </div>
-                  <div className="bg-slate-50 p-2 rounded text-[10px] text-slate-500">
-                    <p>🕒 Sif Kerja: <b>08:00 - 14:00 WIB</b></p>
-                    <p className="mt-1">📍 Lokasi Tugas: <span className="text-blue-600 font-bold">Lantai 2 - ICU Kamar 01</span></p>
+                  <div className="text-[10px] text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p className="font-bold text-slate-800 mb-1">Fokus Layanan:</p>
+                    Tindakan invasif kateterisasi jantung, penanganan gagal jantung akut, dan pemasangan pacemaker. Berpengalaman &gt;15 tahun.
                   </div>
-                  <span className="w-full text-center bg-emerald-100 text-emerald-800 text-[10px] font-bold py-1 rounded">STANBY DI RUANGAN</span>
+                  <div className="flex flex-col gap-2 text-[10px] text-slate-500 mt-2">
+                    <p className="flex justify-between border-b pb-1"><span>🕒 Sif Kerja:</span> <b>08:00 - 14:00 WIB</b></p>
+                    <p className="flex justify-between"><span>📍 Lokasi Tugas:</span> <span className="text-indigo-600 font-bold">Lantai 2 - ICU 01</span></p>
+                  </div>
+                  <span className="w-full text-center bg-emerald-100 text-emerald-800 text-[10px] font-black tracking-widest py-2 rounded-lg">LIVE: DI RUANGAN</span>
                 </div>
 
-                {/* Dokter 2 */}
-                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-between gap-3">
+                <div className="bg-white border border-indigo-100 p-5 rounded-2xl shadow-md flex flex-col justify-between gap-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-extrabold text-xs text-slate-800">dr. Amanda, Sp.An</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Spesialis Anestesiologi &amp; Reanimasi</p>
+                      <p className="font-black text-sm text-slate-800">dr. Amanda, Sp.A</p>
+                      <p className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full mt-2 inline-block flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Pediatric Clinic
+                      </p>
                     </div>
-                    <span className="text-base">🧪</span>
                   </div>
-                  <div className="bg-slate-50 p-2 rounded text-[10px] text-slate-500">
-                    <p>🕒 Sif Kerja: <b>07:00 - 15:00 WIB</b></p>
-                    <p className="mt-1">📍 Lokasi Tugas: <span className="text-red-600 font-bold">OK Bedah Utama L2</span></p>
+                  <div className="text-[10px] text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p className="font-bold text-slate-800 mb-1">Fokus Layanan:</p>
+                    Pemeriksaan tumbuh kembang anak, penanganan asma pediatrik, imunisasi lengkap, dan gawat darurat neonatus (NICU).
                   </div>
-                  <span className="w-full text-center bg-red-100 text-red-800 text-[10px] font-bold py-1 rounded animate-pulse">SEDANG TINDAKAN OPERASI</span>
+                  <div className="flex flex-col gap-2 text-[10px] text-slate-500 mt-2">
+                    <p className="flex justify-between border-b pb-1"><span>🕒 Sif Kerja:</span> <b>07:00 - 15:00 WIB</b></p>
+                    <p className="flex justify-between"><span>📍 Lokasi Tugas:</span> <span className="text-rose-600 font-bold">OK Bedah L2</span></p>
+                  </div>
+                  <span className="w-full text-center bg-rose-100 text-rose-800 text-[10px] font-black tracking-widest py-2 rounded-lg animate-pulse">LIVE: OPERASI CITO</span>
                 </div>
 
-                {/* Dokter 3 */}
-                <div className="bg-white border border-slate-200 p-4 rounded-xl shadow-sm flex flex-col justify-between gap-3">
+                <div className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-md flex flex-col justify-between gap-4">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-extrabold text-xs text-slate-800">dr. Budi, Sp.OT</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Spesialis Bedah Orthopedi &amp; Traumatologi</p>
+                      <p className="font-black text-sm text-slate-800">dr. Budi, Sp.OT</p>
+                      <p className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full mt-2 inline-block flex items-center gap-1">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                        Orthopedic &amp; Trauma
+                      </p>
                     </div>
-                    <span className="text-base">🦴</span>
                   </div>
-                  <div className="bg-slate-50 p-2 rounded text-[10px] text-slate-500">
-                    <p>🕒 Sif Kerja: <b>10:00 - 17:00 WIB</b></p>
-                    <p className="mt-1">📍 Lokasi Tugas: <span className="text-amber-600 font-bold">Poliklinik Bedah Tulang 1</span></p>
+                  <div className="text-[10px] text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <p className="font-bold text-slate-800 mb-1">Fokus Layanan:</p>
+                    Bedah tulang, penanganan patah tulang pasca kecelakaan, penggantian sendi pinggul, dan kedokteran olahraga.
                   </div>
-                  <span className="w-full text-center bg-amber-100 text-amber-800 text-[10px] font-bold py-1 rounded">KONSULTASI POLI RAJAL</span>
+                  <div className="flex flex-col gap-2 text-[10px] text-slate-500 mt-2">
+                    <p className="flex justify-between border-b pb-1"><span>🕒 Sif Kerja:</span> <b>10:00 - 17:00 WIB</b></p>
+                    <p className="flex justify-between"><span>📍 Lokasi Tugas:</span> <span className="text-amber-600 font-bold">Poli Tulang</span></p>
+                  </div>
+                  <span className="w-full text-center bg-amber-100 text-amber-800 text-[10px] font-black tracking-widest py-2 rounded-lg">LIVE: KONSULTASI</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ================= 4. MODUL LENGKAP: FINANSIAL & GRAFIK AGREGAT KEUANGAN ================= */}
+          {/* ================= 4. MODUL LENGKAP: FINANSIAL ================= */}
           {activeMenu === 'keuangan' && (
             <div className="flex flex-col gap-5 animate-fade-in">
-              {/* Baris Kartu Finansial Finansial */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="bg-gradient-to-br from-blue-50 to-blue-100/40 border border-blue-200 p-4 rounded-xl shadow-sm flex flex-col justify-between">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100/40 border border-indigo-200 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
                   <div>
-                    <p className="text-[10px] text-blue-700 font-bold uppercase tracking-wider">Total Klaim BPJS Kesehatan (Hari Ini)</p>
-                    <p className="text-xl md:text-2xl font-black text-slate-800 font-mono mt-1">Rp 142.850.000</p>
+                    <p className="text-[10px] text-indigo-700 font-black uppercase tracking-widest">Total Klaim BPJS (Hari Ini)</p>
+                    <p className="text-2xl md:text-3xl font-black text-slate-800 font-mono mt-2">Rp 142.850.000</p>
                   </div>
-                  <p className="text-[9px] text-slate-400 mt-3">📊 Berhasil di-agregat otomatis dari 96 berkas rekam medis elektronik.</p>
+                  <p className="text-[10px] font-medium text-slate-500 mt-4">📊 Di-agregat otomatis dari 96 rekam medis elektronik.</p>
                 </div>
 
-                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/40 border border-emerald-200 p-4 rounded-xl shadow-sm flex flex-col justify-between">
+                <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/40 border border-emerald-200 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
                   <div>
-                    <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">Pendapatan Mandiri/Pasien Umum</p>
-                    <p className="text-xl md:text-2xl font-black text-slate-800 font-mono mt-1">Rp 38.420.000</p>
+                    <p className="text-[10px] text-emerald-700 font-black uppercase tracking-widest">Pendapatan Pasien Umum</p>
+                    <p className="text-2xl md:text-3xl font-black text-slate-800 font-mono mt-2">Rp 38.420.000</p>
                   </div>
-                  <p className="text-[9px] text-slate-400 mt-3">💳 Tervalidasi instan oleh kanal payment gateway kasir pusat.</p>
+                  <p className="text-[10px] font-medium text-slate-500 mt-4">💳 Tervalidasi instan oleh kanal payment gateway pusat.</p>
                 </div>
               </div>
 
-              {/* Grafik Agregat Mini Transaksi Harian */}
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
-                <div className="border-b pb-2 mb-4">
-                  <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide text-rose-600">📈 Tren Akumulasi Arus Kas Masuk (Revenue History)</h3>
+              <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
+                <div className="border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide text-rose-600">Tren Akumulasi Arus Kas Masuk (Revenue History)</h3>
                 </div>
-                <div className="w-full h-44 bg-slate-50 border p-2 rounded-xl shadow-inner">
-                  <ResponsiveContainer width="100%" height="100%">
+                <div className="w-full h-56 bg-slate-50/50 p-2 rounded-xl">
+                  {/* Menambahkan minWidth={1} dan minHeight={1} untuk memperbaiki error Recharts */}
+                  <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <LineChart data={[
                       { tanggal: '21 Mei', rupiah: 110 },
                       { tanggal: '22 Mei', rupiah: 135 },
@@ -359,9 +460,9 @@ export default function Home() {
                       { tanggal: '24 Mei', rupiah: 165 },
                       { tanggal: '25 Mei', rupiah: 142 },
                     ]}>
-                      <XAxis dataKey="tanggal" stroke="#94a3b8" fontSize={9} tickLine={false} />
-                      <Tooltip contentStyle={{ fontSize: '10px' }} formatter={(value) => [`Rp ${value}.000.000`, 'Pendapatan']} />
-                      <Line type="monotone" dataKey="rupiah" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4 }} />
+                      <XAxis dataKey="tanggal" stroke="#94a3b8" fontSize={10} tickLine={false} />
+                      <Tooltip contentStyle={{ fontSize: '11px', borderRadius: '8px' }} formatter={(value) => [`Rp ${value}.000.000`, 'Pendapatan']} />
+                      <Line type="monotone" dataKey="rupiah" stroke="#4f46e5" strokeWidth={4} dot={{ r: 5, fill: '#4f46e5' }} activeDot={{ r: 7 }} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
@@ -371,7 +472,6 @@ export default function Home() {
 
         </div>
       </div>
-
     </div>
   );
 }
