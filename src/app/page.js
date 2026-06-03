@@ -19,43 +19,47 @@ export default function Home() {
       standby: 3,
       gps: [
         { id: 'AMB-01', location: 'Jl. Kaliurang Km 5', status: 'Menuju TKP' },
-        { id: 'AMB-02', location: 'Base RS (Siaga)', status: 'Standby' }
+        { id: 'AMB-02', location: 'Base RS (Gedung A)', status: 'Standby' },
+        { id: 'AMB-03', location: 'Ringroad Utara', status: 'Menuju RS' },
+        { id: 'AMB-04', location: 'Pos Medik Timur', status: 'Standby' },
+        { id: 'AMB-05', location: 'Area Parkir VIP', status: 'Standby' }
       ]
     },
     doctors: []
   });
 
-  // Efek Rute GPS Ambulans
+  // LOGIKA PERBAIKAN: Hitung jumlah Standby secara real-time dari list GPS
+  const currentStandbyCount = operationalData.ambulance.gps?.filter(loc => loc.status === 'Standby').length || 0;
+
+  // Efek Rute GPS Ambulans (Multitasking Tracker)
   useEffect(() => {
-    const ruteJalan = [
-      'Jl. Kaliurang Km 5', 
-      'Perempatan Kentungan', 
-      'Ringroad Utara', 
-      'Jl. Monjali', 
-      'RSUP Dr. Sardjito',
-      'Gerbang Utama Kampus'
-    ];
+    const ruteA = ['Jl. Kaliurang Km 5', 'Perempatan Kentungan', 'Ringroad Utara', 'Jl. Monjali', 'RSUP Dr. Sardjito', 'Gerbang Utama Kampus'];
+    const ruteB = ['Jl. Magelang', 'Kawasan TVRI', 'Bundaran UGM', 'Klinik Korpri', 'Gedung Pusat UGM', 'Gedung Teknik Fisika'];
+    
     let step = 0;
     
     const gpsInterval = setInterval(() => {
-      step = (step + 1) % ruteJalan.length;
+      step = (step + 1) % ruteA.length;
       setOperationalData(prev => ({
         ...prev,
         ambulance: {
           ...prev.ambulance,
           gps: prev.ambulance.gps?.map(loc => {
             if (loc.id === 'AMB-01') {
-               return { ...loc, location: ruteJalan[step] };
+               return { ...loc, location: ruteA[step], status: 'Menuju TKP' };
+            }
+            if (loc.id === 'AMB-03') {
+               return { ...loc, location: ruteB[step], status: 'Menuju RS' };
             }
             return loc;
           }) || []
         }
       }));
-    }, 4000);
+    }, 4500);
     return () => clearInterval(gpsInterval);
   }, []);
 
-  // Polling Sensor Ruangan (Dengan penanganan error HTML)
+  // Polling Sensor Ruangan
   useEffect(() => {
     let interval;
     if (selectedRoom) {
@@ -68,7 +72,6 @@ export default function Home() {
           .then((data) => setRoomData(data))
           .catch((err) => {
             console.error("Error telemetry fetch:", err);
-            // Mencegah crash jika API gagal (misal RNP-301 belum ada)
             setRoomData({ error: "Data sensor ruangan ini belum tersedia di API" }); 
           });
       };
@@ -108,7 +111,7 @@ export default function Home() {
       
       {/* ================= SIDEBAR MENU ================= */}
       <div className="w-full md:w-64 bg-indigo-950 text-indigo-100 flex flex-col justify-between shadow-2xl flex-shrink-0">
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full overflow-hidden">
           <div className="p-4 md:p-5 border-b border-indigo-900 flex items-center justify-between md:justify-start gap-3 bg-indigo-900/50">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white font-black text-base md:text-lg shadow-lg shadow-blue-500/30">
@@ -141,22 +144,22 @@ export default function Home() {
             </button>
           </div>
 
-          <div className="hidden md:flex flex-col flex-1 justify-end p-4">
-            <div className="bg-indigo-900/30 border border-indigo-800/50 rounded-2xl p-4 backdrop-blur-sm">
-              <p className="text-[10px] font-black text-cyan-400 mb-3 uppercase tracking-widest flex items-center gap-2">
+          <div className="hidden md:flex flex-col flex-1 justify-end p-4 min-h-0">
+            <div className="bg-indigo-900/30 border border-indigo-800/50 rounded-2xl p-4 backdrop-blur-sm flex flex-col min-h-0">
+              <p className="text-[10px] font-black text-cyan-400 mb-3 uppercase tracking-widest flex items-center gap-2 flex-shrink-0">
                 <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span> Live Fleet Tracker
               </p>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2 overflow-y-auto pr-1 custom-scrollbar">
                 {operationalData.ambulance.gps?.map(loc => (
-                  <div key={loc.id} className="flex justify-between items-center bg-indigo-950/80 p-3 rounded-xl border border-indigo-800 shadow-inner">
-                    <div>
-                      <p className="text-white font-bold text-[10px]">{loc.id}</p>
-                      <p className="text-indigo-300 text-[9px] mt-1 flex items-center gap-1">
-                        <svg className="w-3 h-3 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                  <div key={loc.id} className="flex justify-between items-center bg-indigo-950/80 p-2.5 rounded-xl border border-indigo-800 shadow-inner flex-shrink-0">
+                    <div className="min-w-0">
+                      <p className="text-white font-black text-[9px]">{loc.id}</p>
+                      <p className="text-indigo-300 text-[8px] mt-0.5 flex items-center gap-1 truncate">
+                        <svg className="w-2.5 h-2.5 text-rose-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path></svg>
                         {loc.location}
                       </p>
                     </div>
-                    <span className={`px-2 py-1 rounded-md font-black text-[8px] uppercase tracking-wider ${loc.status === 'Menuju TKP' ? 'bg-cyan-500/20 text-cyan-400 shadow-[0_0_10px_rgba(34,211,238,0.2)] animate-pulse' : 'bg-slate-800 text-slate-400'}`}>
+                    <span className={`px-1.5 py-0.5 rounded-md font-black text-[7px] uppercase tracking-wider flex-shrink-0 ${loc.status.includes('Menuju') ? 'bg-cyan-500/20 text-cyan-400 animate-pulse' : 'bg-slate-800 text-slate-400'}`}>
                       {loc.status}
                     </span>
                   </div>
@@ -205,11 +208,12 @@ export default function Home() {
                   </div>
                 </div>
 
+                {/* SINKRONISASI: Menggunakan currentStandbyCount agar sesuai list */}
                 <div className="bg-gradient-to-br from-cyan-500 to-blue-500 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-blue-500/30 min-w-0 border border-white/20">
                   <div className="min-w-0">
                     <p className="text-[10px] md:text-xs text-white/80 font-black truncate uppercase tracking-widest">Ambulans Siaga</p>
                     <p className="text-xl md:text-3xl font-black text-white mt-1 font-mono truncate">
-                      {operationalData.ambulance.standby}<span className="text-[10px] md:text-sm font-bold text-white/70">/{operationalData.ambulance.total} Unit</span>
+                      {currentStandbyCount}<span className="text-[10px] md:text-sm font-bold text-white/70">/{operationalData.ambulance.total} Unit</span>
                     </p>
                   </div>
                   <div className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white flex-shrink-0 shadow-inner">
@@ -249,7 +253,6 @@ export default function Home() {
                            <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
                            TREN KUNJUNGAN IGD PER JAM
                         </p>
-                        {/* Menambahkan minWidth={1} dan minHeight={1} untuk memperbaiki error Recharts */}
                         <ResponsiveContainer width="100%" height="80%" minWidth={1} minHeight={1}>
                           <BarChart data={operationalData.queue_trend}>
                             <XAxis dataKey="hour" stroke="#94a3b8" fontSize={10} tickLine={false} />
@@ -297,7 +300,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* ================= 2. MODUL LENGKAP: FARMASI ================= */}
+          {/* ================= 2. MODUL FARMASI ================= */}
           {activeMenu === 'farmasi' && (
             <div className="flex flex-col gap-5 animate-fade-in">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -322,7 +325,6 @@ export default function Home() {
                   <span className="text-[9px] bg-indigo-50 text-indigo-700 font-bold px-2 py-0.5 rounded-full mt-2 inline-block animate-pulse">⏱️ Proses Apoteker</span>
                 </div>
               </div>
-
               <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col gap-4">
                 <div className="border-b pb-3 flex items-center gap-2">
                   <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
@@ -349,14 +351,13 @@ export default function Home() {
             </div>
           )}
 
-          {/* ================= 3. MODUL LENGKAP: TIM MEDIS ================= */}
+          {/* ================= 3. MODUL TIM MEDIS ================= */}
           {activeMenu === 'personalia' && (
             <div className="flex flex-col gap-5 animate-fade-in">
               <div className="border-b border-slate-200 pb-3">
                 <h3 className="text-sm font-black text-slate-800 uppercase tracking-wide">👨‍⚕️ Profil Layanan &amp; Penugasan Spesialis</h3>
                 <p className="text-[11px] text-slate-500 mt-1">Informasi lengkap terkait dokter spesialis, jadwal, dan deskripsi layanan klinis.</p>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="bg-white border border-rose-100 p-5 rounded-2xl shadow-md flex flex-col justify-between gap-4">
                   <div className="flex items-start justify-between">
@@ -378,7 +379,6 @@ export default function Home() {
                   </div>
                   <span className="w-full text-center bg-emerald-100 text-emerald-800 text-[10px] font-black tracking-widest py-2 rounded-lg">LIVE: DI RUANGAN</span>
                 </div>
-
                 <div className="bg-white border border-indigo-100 p-5 rounded-2xl shadow-md flex flex-col justify-between gap-4">
                   <div className="flex items-start justify-between">
                     <div>
@@ -399,7 +399,6 @@ export default function Home() {
                   </div>
                   <span className="w-full text-center bg-rose-100 text-rose-800 text-[10px] font-black tracking-widest py-2 rounded-lg animate-pulse">LIVE: OPERASI CITO</span>
                 </div>
-
                 <div className="bg-white border border-emerald-100 p-5 rounded-2xl shadow-md flex flex-col justify-between gap-4">
                   <div className="flex items-start justify-between">
                     <div>
@@ -424,7 +423,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* ================= 4. MODUL LENGKAP: FINANSIAL ================= */}
+          {/* ================= 4. MODUL FINANSIAL ================= */}
           {activeMenu === 'keuangan' && (
             <div className="flex flex-col gap-5 animate-fade-in">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -435,7 +434,6 @@ export default function Home() {
                   </div>
                   <p className="text-[10px] font-medium text-slate-500 mt-4">📊 Di-agregat otomatis dari 96 rekam medis elektronik.</p>
                 </div>
-
                 <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/40 border border-emerald-200 p-5 rounded-2xl shadow-sm flex flex-col justify-between">
                   <div>
                     <p className="text-[10px] text-emerald-700 font-black uppercase tracking-widest">Pendapatan Pasien Umum</p>
@@ -444,14 +442,12 @@ export default function Home() {
                   <p className="text-[10px] font-medium text-slate-500 mt-4">💳 Tervalidasi instan oleh kanal payment gateway pusat.</p>
                 </div>
               </div>
-
               <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm">
                 <div className="border-b border-slate-100 pb-3 mb-4 flex items-center gap-2">
                   <svg className="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wide text-rose-600">Tren Akumulasi Arus Kas Masuk (Revenue History)</h3>
                 </div>
                 <div className="w-full h-56 bg-slate-50/50 p-2 rounded-xl">
-                  {/* Menambahkan minWidth={1} dan minHeight={1} untuk memperbaiki error Recharts */}
                   <ResponsiveContainer width="100%" height="100%" minWidth={1} minHeight={1}>
                     <LineChart data={[
                       { tanggal: '21 Mei', rupiah: 110 },
